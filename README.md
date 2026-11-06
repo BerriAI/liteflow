@@ -2,6 +2,8 @@
 
 code-first workflows for the LiteLLM AI Gateway
 
+![Liteflow workflow defined in Python with LLM calls, Python transforms, and an if/else branch](docs/assets/liteflow-workflow.gif)
+
 chain LLM calls and typed Python functions. each node passes its result to the next:
 
 ```python
@@ -151,8 +153,6 @@ workflow = Workflow(name="compare-email-summaries", nodes=[
 ```
 
 see [graph workflows](docs/graph-workflows.md) for input bindings, limits and node settings.
-
-![Liteflow workflow defined in Python with LLM calls, Python transforms, and an if/else branch](docs/assets/liteflow-workflow.gif)
 
 *Workflow design preview.*
 
