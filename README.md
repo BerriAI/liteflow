@@ -2,55 +2,73 @@
 
 code-first workflows for the LiteLLM AI Gateway
 
-![Liteflow workflow defined in Python with LLM calls, Python transforms, and an if/else branch](docs/assets/liteflow-workflow.gif)
+chain LLM calls and typed Python functions. each node passes its result to the next:
 
-*Workflow design preview.*
+```python
+from liteflow import ChatCompletion, ChatMessage, Input, Python, Workflow
 
-write your workflow in Python, run it on your gateway, and read the result.
 
-## Workflow types
+def review_messages(draft: str) -> list[ChatMessage]:
+    return [{"role": "user", "content": "Review and improve this reply: " + draft}]
 
-- **Sequential:** run nodes in order, passing each result to the next node.
-- **Parallel:** run named branches together and collect their results.
-- **Loop:** use `ForEach` to run the same steps for each item in a list.
-- **Conditional:** use `If` to choose a branch from a structured result.
-- **Hybrid:** combine these patterns in one workflow.
 
-## Installation
-
-install from a source checkout:
-
-```sh
-python -m pip install -e .
+workflow = Workflow(name="email-reply", nodes=[
+    ChatCompletion(model="sonnet", messages=Input.messages),
+    Python(fn=review_messages),
+    ChatCompletion(model="haiku", messages=Input.previous),
+])
 ```
 
-these examples compile with this SDK. gateway graph execution is still in development.
+Sonnet drafts a reply. Python turns that draft into review messages. Haiku reads those messages and returns the final reply.
 
-## Examples
+## Register and run
 
-use these imports for the examples below. replace `sonnet` and `haiku` with your gateway's model aliases.
+install from a source checkout with `python -m pip install -e .`. replace `sonnet` and `haiku` with your gateway's model aliases.
+
+set `LITELLM_PROXY_URL` to your gateway root URL without `/v1`, and keep your key in `LITELLM_PROXY_API_KEY`. register the workflow:
+
+```python
+import os
+
+from liteflow import GatewayClient
+
+gateway = GatewayClient(
+    base_url=os.environ["LITELLM_PROXY_URL"],
+    api_key=os.environ["LITELLM_PROXY_API_KEY"],
+)
+draft = gateway.register(workflow)
+```
+
+ask a separate authorized reviewer to publish the draft. then run it and read the result:
+
+```python
+result = gateway.run(workflow.name, messages=[
+    {"role": "system", "content": "Write a short customer-service reply."},
+    {"role": "user", "content": "How can I update my account email?"},
+])
+print(result.output)
+gateway.close()
+```
+
+`run()` uses Chat Completions with `model="workflow/email-reply"`. `Input.messages` is the original request; `Input.previous` is the previous node's result. use `result.run_id` to inspect the run.
+
+## Advanced workflows
+
+the node list above is sequential. use these patterns when you need more control:
+
+- **Parallel:** run named branches together and collect their results.
+- **Loop:** use `ForEach` to process each item in a list.
+- **Conditional:** use `If` to choose a branch from a structured result.
+- **Hybrid:** nest these patterns inside one another.
+
+graph definitions compile with this SDK; gateway graph execution is still in development.
 
 ```python
 from typing import Literal
 
 from pydantic import BaseModel
 
-from liteflow import ChatCompletion, ChatMessage, ForEach, If, Input, Parallel, Python, Workflow
-```
-
-### Sequential
-
-generate a reply, then pass it to a typed Python function:
-
-```python
-def add_signature(reply: str) -> str:
-    return reply + "\n\nCustomer Care"
-
-
-workflow = Workflow(name="email-reply", nodes=[
-    ChatCompletion(model="sonnet", messages=Input.messages),
-    Python(fn=add_signature),
-])
+from liteflow import ForEach, If, Parallel
 ```
 
 ### Parallel
@@ -132,35 +150,11 @@ workflow = Workflow(name="compare-email-summaries", nodes=[
 ])
 ```
 
-## Register and run
+see [graph workflows](docs/graph-workflows.md) for input bindings, limits and node settings.
 
-on a gateway supporting the selected workflow type, use the same client below. set `LITELLM_PROXY_URL` to the gateway root URL without `/v1`, and keep your key in `LITELLM_PROXY_API_KEY`.
+![Liteflow workflow defined in Python with LLM calls, Python transforms, and an if/else branch](docs/assets/liteflow-workflow.gif)
 
-```python
-import os
-
-from liteflow import GatewayClient
-
-gateway = GatewayClient(
-    base_url=os.environ["LITELLM_PROXY_URL"],
-    api_key=os.environ["LITELLM_PROXY_API_KEY"],
-)
-draft = gateway.register(workflow)
-```
-
-ask a separate authorized reviewer to publish the draft. then run it:
-
-```python
-result = gateway.run(workflow.name, messages=[
-    {"role": "user", "content": "Summarize these emails: My refund is late. Thanks for your help!"},
-])
-print(result.output)
-gateway.close()
-```
-
-`run()` uses Chat Completions with `model="workflow/<name>"`. use `result.run_id` to inspect the run.
-
-see [graph workflows](docs/graph-workflows.md) for input bindings, limits and node settings, or browse the [full examples](examples/).
+*Workflow design preview.*
 
 ## About
 
