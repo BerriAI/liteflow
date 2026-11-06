@@ -68,6 +68,48 @@ def test_show_json_without_credentials():
     assert result["bundle"]["output"] == {"from": "node_2", "output": "result"}
 
 
+@pytest.mark.parametrize(
+    "nodes,error",
+    [
+        ("[chat, Sequence(nodes=[Python(fn=finish)])]", "unsupported node kind Sequence"),
+        ("[chat, Parallel(branches={'left': [Python(fn=finish)]})]", "unsupported node kind Parallel"),
+        (
+            "[ForEach(items=['first'], nodes=[Python(fn=finish)])]",
+            "unsupported node kind ForEach",
+        ),
+        (
+            "[chat, If(condition=predicate, then=[Python(fn=finish)], otherwise=[Python(fn=finish)])]",
+            "unsupported node kind If",
+        ),
+        (
+            "[ChatCompletion(model='model', messages=Input.messages, response_model=Record), "
+            "Python(fn=finish, inputs={'text': Input.previous.field('text')})]",
+            "unsupported binding kind FieldRef",
+        ),
+    ],
+)
+def test_show_unsupported_graph_features_are_explicit_and_json_still_works(tmp_path, nodes, error):
+    path = tmp_path / "graph.py"
+    path.write_text(
+        "from liteflow import ChatCompletion, ForEach, If, Input, Parallel, Python, Sequence, Workflow\n"
+        "from pydantic import BaseModel\n"
+        "from cli_workflow import finish\n"
+        "class Record(BaseModel):\n"
+        "    text: str\n"
+        "def predicate(text: str) -> bool:\n"
+        "    return bool(text)\n"
+        "chat = ChatCompletion(model='model', messages=Input.messages)\n"
+        f"workflow = Workflow(name='graph', nodes={nodes})\n"
+    )
+    target = f"{path}:workflow"
+    code, out, err = invoke(["show", target], env={})
+    assert code == 1 and out == ""
+    assert err == f"error: {error}\n"
+    code, out, err = invoke(["show", target, "--json"], env={})
+    assert code == 0 and err == ""
+    assert json.loads(out)["bundle"]["contract_version"] == "2"
+
+
 def test_run_json():
     def gateway(request):
         assert json.loads(request.content) == {

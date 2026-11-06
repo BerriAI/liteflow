@@ -7,7 +7,7 @@ from rich.table import Column, Table
 from rich.text import Text
 from rich.tree import Tree
 
-from liteflow import ChatCompletion, RunSteps, Workflow
+from liteflow import ChatCompletion, Python, RunSteps, Workflow
 from liteflow.cli.sanitize import sanitize
 
 
@@ -29,12 +29,17 @@ def fields(target: Console, values: Mapping[str, object]) -> None:
 
 
 def binding(value: object) -> str:
+    if isinstance(value, dict) and "path" in value:
+        raise ValueError("unsupported binding kind FieldRef")
     if isinstance(value, dict) and "from" in value:
         return f"{value['from']}.{value['output']}"
     return "literal " + json.dumps(value.get("value") if isinstance(value, dict) else value, ensure_ascii=True)
 
 
 def show(target: Console, workflow: Workflow, bundle: Mapping[str, object]) -> None:
+    for node in workflow.nodes:
+        if not isinstance(node, (ChatCompletion, Python)):
+            raise ValueError(f"unsupported node kind {type(node).__name__}")
     tree = Tree(text(workflow.name))
     for index, (node, compiled) in enumerate(zip(workflow.nodes, bundle["nodes"], strict=True), 1):
         label = (
