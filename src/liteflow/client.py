@@ -2,6 +2,7 @@ from collections.abc import Mapping, Sequence
 from typing import Final
 
 import httpx
+from openai.types.chat import ChatCompletion as ChatCompletionResponse
 from pydantic import BaseModel, ConfigDict, JsonValue, TypeAdapter
 
 from liteflow.authoring import ChatMessage, Workflow
@@ -21,6 +22,14 @@ class Draft(BaseModel):
 
 
 _JSON_OBJECT: Final = TypeAdapter[Mapping[str, JsonValue]](Mapping[str, JsonValue])
+_COMPLETION: Final = TypeAdapter(ChatCompletionResponse)
+
+
+class RunResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    output: str
+    run_id: str
 
 
 class GatewayClient:
@@ -40,6 +49,30 @@ class GatewayClient:
             transport=transport,
         )
         self._team_id: Final = team_id
+
+    def run(
+        self,
+        name: str,
+        *,
+        messages: Sequence[ChatMessage],
+        idempotency_key: str | None = None,
+    ) -> RunResult:
+        response = self._client.post(
+            "/v1/chat/completions",
+            json={"model": f"workflow/{name}", "messages": messages, "stream": False},
+            headers={"Idempotency-Key": idempotency_key} if idempotency_key is not None else {},
+        )
+        response.raise_for_status()
+        completion = _COMPLETION.validate_json(response.content, strict=True)
+        if len(completion.choices) != 1:
+            raise ValueError("Workflow response must contain one final assistant message")
+        content = completion.choices[0].message.content
+        if not isinstance(content, str) or not content:
+            raise ValueError("Workflow response must contain final assistant content")
+        run_id = response.headers.get("x-litellm-workflow-run-id")
+        if run_id is None or not run_id.strip():
+            raise ValueError("Workflow response is missing its run ID")
+        return RunResult(output=content, run_id=run_id)
 
     def register(self, workflow: Workflow, *, draft: Draft | None = None) -> Draft:
         path = "/v1/workflows" if draft is None else f"/v1/workflows/{draft.workflow_id}"

@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from liteflow import ChatCompletion, Draft, GatewayClient, Input, Workflow, bundle_digest
+from liteflow import ChatCompletion, Draft, GatewayClient, Input, RunResult, Workflow, bundle_digest
 
 
 def test_registration_uses_the_bundle_etag_for_replacement_and_publication():
@@ -78,3 +78,105 @@ def test_validation_draft_test_and_inspection_keep_authorization_explicit():
         "messages": [{"role": "user", "content": "Review"}],
         "authorize_billing": True,
     }
+
+
+def _completion(message):
+    return {
+        "id": "chatcmpl-run-id",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "workflow/email-reply",
+        "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
+    }
+
+
+@pytest.mark.parametrize("output", ["Reviewed reply", '{"approved":true}'])
+@pytest.mark.parametrize("idempotency_key", [None, "same-request"])
+def test_run_only_invokes_standard_completions_and_returns_inspectable_content(output, idempotency_key):
+    requests = []
+
+    def gateway(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            headers={"x-litellm-workflow-run-id": "run-id"},
+            json=_completion({"role": "assistant", "content": output}),
+        )
+
+    messages = [{"role": "user", "content": "Review this draft"}]
+    with GatewayClient(
+        base_url="https://gateway.invalid", api_key="synthetic", transport=httpx.MockTransport(gateway)
+    ) as client:
+        result = client.run("email-reply", messages=messages, idempotency_key=idempotency_key)
+    assert result == RunResult(output=output, run_id="run-id")
+    assert len(requests) == 1
+    request = requests[0]
+    assert (request.method, request.url.path) == ("POST", "/v1/chat/completions")
+    assert json.loads(request.content) == {"model": "workflow/email-reply", "messages": messages, "stream": False}
+    assert request.headers.get("Idempotency-Key") == idempotency_key
+    assert request.headers["Authorization"] == "Bearer synthetic"
+    assert not request.url.params
+
+
+@pytest.mark.parametrize("status", [403, 404, 409, 429, 500])
+def test_run_preserves_http_errors(status):
+    def gateway(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status, json={"error": {"message": "Request refused"}})
+
+    with GatewayClient(
+        base_url="https://gateway.invalid", api_key="synthetic", transport=httpx.MockTransport(gateway)
+    ) as client:
+        with pytest.raises(httpx.HTTPStatusError) as error:
+            client.run("email-reply", messages=[{"role": "user", "content": "Review"}])
+    assert error.value.response.status_code == status
+    assert error.value.response.json() == {"error": {"message": "Request refused"}}
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        {"role": "assistant"},
+        {"role": "assistant", "content": None},
+        {"role": "assistant", "content": ""},
+        {"role": "assistant", "content": 123},
+        {"role": "assistant", "content": {"text": "not content"}},
+        {"role": "user", "content": "not an assistant"},
+    ],
+)
+def test_run_rejects_missing_or_invalid_final_content(message):
+    def gateway(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"x-litellm-workflow-run-id": "run-id"}, json=_completion(message))
+
+    with GatewayClient(
+        base_url="https://gateway.invalid", api_key="synthetic", transport=httpx.MockTransport(gateway)
+    ) as client:
+        with pytest.raises(ValueError):
+            client.run("email-reply", messages=[{"role": "user", "content": "Review"}])
+
+
+@pytest.mark.parametrize("choices", [[], None])
+def test_run_rejects_missing_final_choice(choices):
+    def gateway(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-litellm-workflow-run-id": "run-id"},
+            json={**_completion({"role": "assistant", "content": "Reply"}), "choices": choices},
+        )
+
+    with GatewayClient(
+        base_url="https://gateway.invalid", api_key="synthetic", transport=httpx.MockTransport(gateway)
+    ) as client:
+        with pytest.raises(ValueError):
+            client.run("email-reply", messages=[{"role": "user", "content": "Review"}])
+
+
+@pytest.mark.parametrize("headers", [{}, {"x-litellm-workflow-run-id": ""}])
+def test_run_rejects_missing_run_id(headers):
+    def gateway(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers=headers, json=_completion({"role": "assistant", "content": "Reply"}))
+
+    with GatewayClient(
+        base_url="https://gateway.invalid", api_key="synthetic", transport=httpx.MockTransport(gateway)
+    ) as client:
+        with pytest.raises(ValueError, match="run ID"):
+            client.run("email-reply", messages=[{"role": "user", "content": "Review"}])
