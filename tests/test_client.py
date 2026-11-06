@@ -1,7 +1,9 @@
 import json
+from datetime import timedelta
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from liteflow import ChatCompletion, Draft, GatewayClient, Input, RunResult, Workflow, bundle_digest
 
@@ -54,7 +56,7 @@ def test_validation_draft_test_and_inspection_keep_authorization_explicit():
 
     def gateway(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        return httpx.Response(200, json={"valid": True})
+        return httpx.Response(200, json=trace_payload() if request.url.path.endswith("/steps") else {"valid": True})
 
     draft = Draft(
         name="email-reply", workflow_id="draft-id", team_id="test-team", etag='"etag"', digest="digest", bundle={}
@@ -66,7 +68,7 @@ def test_validation_draft_test_and_inspection_keep_authorization_explicit():
         assert client.test(
             draft, messages=[{"role": "user", "content": "Review"}], authorize_billing=True, idempotency_key="retry-key"
         ) == {"valid": True}
-        assert client.inspect("run-id") == {"valid": True}
+        assert client.inspect("run-id").run_id == "run-id"
     assert tuple(request.url.path for request in requests) == (
         "/v1/workflows/draft-id/validate",
         "/v1/workflows/draft-id/test",
@@ -78,6 +80,58 @@ def test_validation_draft_test_and_inspection_keep_authorization_explicit():
         "messages": [{"role": "user", "content": "Review"}],
         "authorize_billing": True,
     }
+
+
+def trace_payload(state="completed", finished_at="2026-01-01T00:00:02Z"):
+    return {
+        "run_id": "run-id",
+        "snapshot_id": "snapshot-id",
+        "state": state,
+        "cancel_requested": False,
+        "steps": [
+            {
+                "step_id": "step-id",
+                "run_id": "run-id",
+                "node_id": "node_1",
+                "state": state,
+                "input": {"text": "hello"},
+                "output": None,
+                "attempts": 1,
+                "deadline": "2026-01-01T00:01:00Z",
+                "started_at": "2026-01-01T00:00:00Z",
+                "finished_at": finished_at,
+                "error": None,
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "response_cost": None,
+                "request_id": None,
+            }
+        ],
+    }
+
+
+@pytest.mark.parametrize("finished_at,duration", [("2026-01-01T00:00:02Z", timedelta(seconds=2)), (None, None)])
+def test_inspect_parses_trace_at_http_boundary(finished_at, duration):
+    with GatewayClient(
+        base_url="https://gateway.invalid",
+        api_key="synthetic",
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=trace_payload(finished_at=finished_at))),
+    ) as client:
+        result = client.inspect("run-id")
+    assert result.steps[0].duration == duration
+    assert result.steps[0].input == {"text": "hello"}
+    assert isinstance(result.steps, tuple)
+    assert result.model_dump(mode="json") == trace_payload(finished_at=finished_at)
+
+
+def test_inspect_rejects_unknown_state():
+    with GatewayClient(
+        base_url="https://gateway.invalid",
+        api_key="synthetic",
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=trace_payload(state="unknown"))),
+    ) as client:
+        with pytest.raises(ValidationError):
+            client.inspect("run-id")
 
 
 def _completion(message):

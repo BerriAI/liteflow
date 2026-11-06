@@ -1,4 +1,6 @@
 from collections.abc import Mapping, Sequence
+from datetime import datetime, timedelta
+from enum import Enum
 from typing import Final
 
 import httpx
@@ -30,6 +32,48 @@ class RunResult(BaseModel):
 
     output: str
     run_id: str
+
+
+class RunState(str, Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class StepTrace(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    step_id: str
+    run_id: str
+    node_id: str
+    state: RunState
+    input: JsonValue
+    output: JsonValue
+    attempts: int
+    deadline: datetime
+    started_at: datetime
+    finished_at: datetime | None
+    error: str | None
+    prompt_tokens: int
+    completion_tokens: int
+    response_cost: float | None
+    request_id: str | None
+
+    @property
+    def duration(self) -> timedelta | None:
+        return None if self.finished_at is None else self.finished_at - self.started_at
+
+
+class RunSteps(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    snapshot_id: str
+    state: RunState
+    cancel_requested: bool
+    steps: tuple[StepTrace, ...]
 
 
 class GatewayClient:
@@ -112,10 +156,10 @@ class GatewayClient:
         response.raise_for_status()
         return _JSON_OBJECT.validate_json(response.content)
 
-    def inspect(self, run_id: str) -> Mapping[str, JsonValue]:
+    def inspect(self, run_id: str) -> RunSteps:
         response = self._client.get(f"/v1/workflows/runs/{run_id}/steps")
         response.raise_for_status()
-        return _JSON_OBJECT.validate_json(response.content)
+        return RunSteps.model_validate_json(response.content)
 
     def test(
         self,
