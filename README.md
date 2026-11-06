@@ -1,19 +1,32 @@
-# Liteflow
+# liteflow
 
-A code-first way to build workflows with the LiteLLM AI Gateway.
+code-first workflows for the LiteLLM AI Gateway
 
-Define model calls, Python transformations, and conditional branches in a typed Python SDK. Register a workflow with your gateway, then invoke it through Chat Completions.
+write a workflow as a list of LLM calls and Python functions. register it with your gateway, then call it through Chat Completions.
 
-**SDK contract in development.** This repository contains the proposed SDK interface, examples, and gateway contract. It does not yet contain an installable SDK or a workflow runner for LiteLLM.
+## Features
 
-## An email reply in two nodes
+- LLM calls with standard Chat Completions arguments
+- Python functions with typed inputs and outputs
+- structured JSON, parallel calls, and if/else branches
+- invocation through the OpenAI client
+
+## Installation
+
+we're building the SDK and gateway runner. the examples below show the proposed API; we haven't released a package.
+
+## Usage
+
+draft a customer email, then add a signature:
 
 ```python
-from liteflow import ChatCompletion, Input, Python, Workflow
+import os
+
+from liteflow import ChatCompletion, GatewayClient, Input, Python, Workflow
 
 
-def add_signature(text: str) -> str:
-    return text.strip() + "\n\nCustomer Care"
+def add_signature(reply: str) -> str:
+    return reply.strip() + "\n\nCustomer Care"
 
 
 workflow = Workflow(
@@ -23,54 +36,6 @@ workflow = Workflow(
         Python(fn=add_signature),
     ],
 )
-```
-
-```text
-Chat Completions request → model draft → Python signature → assistant response
-```
-
-Use a configured gateway model alias for `support-model`. The caller supplies the drafting instructions and customer email in its messages. See the [complete example](examples/email_reply.py).
-
-## Read the workflow
-
-The SDK contract uses these rules:
-
-- `Workflow(nodes=[...])` runs nodes in list order. The list carries the previous node's typed result between stages.
-- `Input.messages` refers to the caller's original Chat Completions messages. `Input.previous` refers to the current result when a node needs an explicit binding.
-- `ChatCompletion` accepts familiar fields such as `model`, `messages`, and `temperature`. Its default result is a string. `response_model=MyModel` declares a structured result with a Pydantic schema.
-- `Python(fn=transform)` uses the function's parameter and return annotations as its schema contract. A unary function receives the previous result.
-- `Parallel(branches={"name": [...]})` runs named branches concurrently. Each branch has a sequential node list; the join returns their named, typed results.
-- `If(condition=predicate, then=[...], otherwise=[...])` evaluates a typed function that returns `bool`. Only the selected branch runs, starting with the same input. Its last result becomes the `If` result.
-
-For a model call after Python prepares messages, bind the result explicitly:
-
-```python
-Python(fn=prepare_messages),  # returns list[ChatMessage]
-ChatCompletion(model="support-model", messages=Input.previous),
-```
-
-Authors use record types to describe data. The planned compiler converts supported records into sandbox-safe data definitions; it does not run Pydantic or arbitrary application packages inside Python nodes. See the [execution contract](docs/execution.md).
-
-## Three parallel calls, then three sequential calls
-
-The [email-processing example](examples/email_processing.py) analyzes urgency, intent, and sentiment in parallel. Python combines those typed findings with the original messages, then prepares each subsequent model call:
-
-```text
-         ┌─ urgency ───┐
-messages ├─ intent ────┼─ Python join → draft → check → finalize → reply
-         └─ sentiment ┘
-```
-
-The example uses `Parallel(branches={...})` for concurrency and `Input.previous` for sequential results. Its Python functions use explicit `inputs` when they need both a prior result and the caller's original messages.
-
-## Register, publish, invoke
-
-The planned SDK separates uploading a draft from publishing it:
-
-```python
-import os
-
-from liteflow import GatewayClient
 
 gateway = GatewayClient(
     base_url=os.environ["LITELLM_PROXY_URL"],
@@ -79,9 +44,11 @@ gateway = GatewayClient(
 gateway.register(workflow)
 ```
 
-`register()` compiles the graph, schemas, and supported Python source into a bundle. The gateway validates the bundle and stores a draft. An authorized publisher activates a reviewed draft through the separate publication API. See the [gateway API contract](docs/gateway-api.md).
+`Input.messages` refers to your request messages. the model returns a string, and `add_signature` takes that string as its input. write nodes in execution order; use the function's annotations to define its input and output.
 
-Once a workflow is published, the planned invocation uses the existing OpenAI client interface:
+set `LITELLM_PROXY_URL` to your gateway URL without `/v1` and `LITELLM_PROXY_API_KEY` to a key with workflow registration and invocation access. use a configured gateway model alias for `support-model`.
+
+`register()` saves a draft. a separate publisher reviews and publishes it before you invoke it:
 
 ```python
 import os
@@ -96,32 +63,30 @@ response = client.chat.completions.create(
     model="workflow/email-reply",
     messages=[
         {"role": "system", "content": "Write a short customer-service reply."},
-        {"role": "user", "content": "How can I update the email address on my account?"},
+        {"role": "user", "content": "How can I update my account email?"},
     ],
 )
 print(response.choices[0].message.content)
 ```
 
-`LITELLM_PROXY_URL` is your gateway's base URL without `/v1`. Store credentials outside workflow files. A string result becomes the assistant message content; the gateway serializes a structured result as JSON content. The invocation route above remains a proposed gateway addition.
+use `workflow/<name>` where you'd use a model name. read the final result from `response.choices[0].message.content`.
 
-## Production application examples
+more examples:
 
-These examples describe application use cases for the proposed interface. They do not represent deployed workflows.
+- [customer emails](examples/email_processing.py): three parallel analyses, then draft, check, and finalize
+- [spreadsheet classification](examples/spreadsheet_classification.py): typed JSON and a Python review threshold
+- [expense intake](examples/expense_review.py): extract fields and choose an if/else branch
 
-| Application | Workflow | Example |
-| --- | --- | --- |
-| Customer email processing | Analyze in parallel, then draft, check, and finalize a reply. | [Email processing](examples/email_processing.py) |
-| Spreadsheet row classification | Produce a typed category and confidence, then route uncertain rows for review. | [Row classification](examples/spreadsheet_classification.py) |
-| Expense intake | Extract fields, normalize currency, and select a review or processing route. | [Expense review](examples/expense_review.py) |
+## About
 
-The row example handles one row per request. Your application retains row identifiers and schedules the workbook's requests. Cost estimates, sampling, and workbook ingestion require separate product work.
+use liteflow for work you can define in advance: process an email, classify a spreadsheet row, or route a request for review. write the steps in Python and run them on your LiteLLM gateway.
 
-The expense example returns a routing decision for the application. It does not approve or send payments.
+see the [gateway API](docs/gateway-api.md), [Python execution contract](docs/execution.md), and [implementation plan](docs/implementation-plan.md).
 
-## Implementation scope
+## License
 
-P0 covers the typed SDK/compiler, workflow registration and publication, Chat Completions invocation, node-local retries and deadlines, Monty execution for pure Python, and run inspection. The gateway implementation must persist node results and expose errors before these examples can run end to end.
+[MIT](LICENSE)
 
-The terminal experience should let developers validate, visualize, invoke, and inspect workflows from Claude Code, Codex, or a shell. API and MCP clients should use the same workflow definitions and execution service. Native retrieval connectors, execution cost estimates, feedback/evals, and advanced caching remain follow-up work.
+## Contributing
 
-Read the [implementation plan](docs/implementation-plan.md) for workstreams and release gates. The [gateway API contract](docs/gateway-api.md) and [execution contract](docs/execution.md) define the implementation boundaries and verification gaps.
+open an issue or pull request. start with the [workflow examples](examples/) and [implementation plan](docs/implementation-plan.md).
