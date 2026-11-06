@@ -56,28 +56,15 @@ gateway.close()
 
 ## Advanced workflows
 
-the node list above is sequential. use these patterns when you need more control:
-
-- **Parallel:** run named branches together and collect their results.
-- **Loop:** use `ForEach` to process each item in a list.
-- **Conditional:** use `If` to choose a branch from a structured result.
-- **Hybrid:** nest these patterns inside one another.
-
-graph definitions compile with this SDK; gateway graph execution is still in development.
-
-```python
-from typing import Literal
-
-from pydantic import BaseModel
-
-from liteflow import ForEach, If, Parallel
-```
+graph definitions compile locally; gateway graph execution is still in development.
 
 ### Parallel
 
-ask two models the same question. the result contains `sonnet` and `haiku` responses:
+ask two models the same question:
 
 ```python
+from liteflow import ChatCompletion, Input, Parallel, Workflow
+
 workflow = Workflow(name="compare-models", nodes=[
     Parallel(branches={
         "sonnet": [ChatCompletion(model="sonnet", messages=Input.messages)],
@@ -86,75 +73,69 @@ workflow = Workflow(name="compare-models", nodes=[
 ])
 ```
 
+the result contains one response per branch.
+
 ### Loop
 
-extract a list of emails, then summarize each one:
+summarize each email in a batch:
 
 ```python
-class Emails(BaseModel):
-    items: list[str]
-
-
-def summary_messages(email: str) -> list[ChatMessage]:
-    return [{"role": "user", "content": "Summarize this email: " + email}]
-
+from liteflow import ChatCompletion, ForEach, Input, Workflow
 
 workflow = Workflow(name="email-summaries", nodes=[
-    ChatCompletion(model="sonnet", messages=Input.messages, response_model=Emails),
-    ForEach(items=Input.previous.field("items"), nodes=[
-        Python(fn=summary_messages),
-        ChatCompletion(model="haiku", messages=Input.previous),
+    ForEach(items=[
+        [{"role": "user", "content": "Summarize: My refund is late."}],
+        [{"role": "user", "content": "Summarize: Thanks for your help!"}],
+    ], nodes=[
+        ChatCompletion(model="haiku", messages=Input.item),
     ]),
 ])
 ```
 
-`ForEach` passes one item to its body and returns results in the original order.
+`Input.item` is the current message batch. results keep the input order. `items` can also reference a list from an earlier node.
 
 ### Conditional
 
-classify an email. send dissatisfied emails to Haiku; return the category for the others:
+use a structured decision to choose which model handles the request:
 
 ```python
-class Classification(BaseModel):
-    category: Literal["feedback", "dissatisfied", "happy"]
+from pydantic import BaseModel
+from liteflow import ChatCompletion, If, Input, Workflow
 
+class Decision(BaseModel):
+    needs_review: bool
 
-def is_dissatisfied(result: Classification) -> bool:
-    return result.category == "dissatisfied"
+def needs_review(result: Decision) -> bool:
+    return result.needs_review
 
-
-def keep_category(result: Classification) -> str:
-    return result.category
-
-
-workflow = Workflow(name="email-triage", nodes=[
-    ChatCompletion(model="sonnet", messages=Input.messages, response_model=Classification),
-    If(condition=is_dissatisfied,
-       then=[ChatCompletion(model="haiku", messages=Input.messages)],
-       otherwise=[Python(fn=keep_category)]),
+workflow = Workflow(name="route-request", nodes=[
+    ChatCompletion(model="haiku", messages=Input.messages, response_model=Decision),
+    If(condition=needs_review,
+       then=[ChatCompletion(model="sonnet", messages=Input.messages)],
+       otherwise=[ChatCompletion(model="haiku", messages=Input.messages)]),
 ])
 ```
 
 ### Hybrid
 
-combine the loop and parallel patterns: get two model summaries for each email. this reuses `Emails` and `summary_messages` above.
+run models in parallel, then combine their answers in a Python step:
 
 ```python
-workflow = Workflow(name="compare-email-summaries", nodes=[
-    ChatCompletion(model="sonnet", messages=Input.messages, response_model=Emails),
-    ForEach(items=Input.previous.field("items"), nodes=[
-        Python(fn=summary_messages),
-        Parallel(branches={
-            "sonnet": [ChatCompletion(model="sonnet", messages=Input.previous)],
-            "haiku": [ChatCompletion(model="haiku", messages=Input.previous)],
-        }),
-    ]),
+from liteflow import ChatCompletion, Input, Parallel, Python, Workflow
+
+def combine(answers: dict[str, str]) -> str:
+    return "\n\n".join(answers.values())
+
+workflow = Workflow(name="combined-answers", nodes=[
+    Parallel(branches={
+        "sonnet": [ChatCompletion(model="sonnet", messages=Input.messages)],
+        "haiku": [ChatCompletion(model="haiku", messages=Input.messages)],
+    }),
+    Python(fn=combine),
 ])
 ```
 
-see [graph workflows](docs/graph-workflows.md) for input bindings, limits and node settings.
-
-*Workflow design preview.*
+register and run any of these with the same client shown above. see [graph workflows](docs/graph-workflows.md) for input bindings and limits.
 
 ## About
 
