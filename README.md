@@ -24,25 +24,150 @@ gateway execution requires the [workflow runner](https://github.com/BerriAI/lite
 
 ## Usage
 
-make a workflow that drafts an email reply and adds a signature:
+process a batch of customer emails. classify each email, then send dissatisfied emails to Haiku for a summary and action items in parallel. return one report per dissatisfied email and keep the category for the others.
+
+```mermaid
+flowchart TD
+    Extract[Extract email list] --> Classify
+    subgraph Each[ForEach email]
+        Classify[Classify email] --> Decision{category is dissatisfied?}
+        Decision -->|yes| Summary[Haiku summary]
+        Decision -->|yes| Actions[Haiku action items]
+        Summary --> Report[Build email report]
+        Actions --> Report
+        Decision -->|no| Keep[Keep category, report null]
+    end
+    Report --> Results[Collect results in input order]
+    Keep --> Results
+```
+
+this example defines sequential steps, a per-item loop, a JSON-field condition and parallel branches in one workflow. copy the complete definition below, or use [the same example file](examples/email_processing_graph.py).
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel
+
+from liteflow import (
+    ChatCompletion,
+    ChatMessage,
+    ForEach,
+    If,
+    Input,
+    Parallel,
+    Python,
+    Retry,
+    Workflow,
+)
+
+Category = Literal["feedback", "dissatisfied", "happy"]
+
+
+class Emails(BaseModel):
+    items: list[str]
+
+
+class Classification(BaseModel):
+    category: Category
+
+
+class Actions(BaseModel):
+    action_items: list[str]
+
+
+class EmailResult(BaseModel):
+    email: str
+    category: Category
+    report: str | None
+
+
+def prompt(email: str, instruction: str) -> list[ChatMessage]:
+    return [{"role": "system", "content": instruction}, {"role": "user", "content": email}]
+
+
+def is_dissatisfied(result: Classification) -> bool:
+    return result.category == "dissatisfied"
+
+
+def make_report(email: str, summary: str, actions: Actions) -> EmailResult:
+    report = summary + "\n\nAction items:\n" + "\n".join(actions.action_items)
+    return EmailResult(email=email, category="dissatisfied", report=report)
+
+
+def no_report(email: str, classification: Classification) -> EmailResult:
+    return EmailResult(email=email, category=classification.category, report=None)
+
+
+def haiku_analysis(instruction: str, response_model: type[BaseModel] | None = None) -> list[Python | ChatCompletion]:
+    return [
+        Python(fn=prompt, inputs={"email": Input.item, "instruction": instruction}),
+        ChatCompletion(model="haiku", messages=Input.previous, response_model=response_model, timeout_seconds=30),
+    ]
+
+
+workflow = Workflow(
+    name="email-processing",
+    nodes=[
+        ChatCompletion(model="support-model", messages=Input.messages, response_model=Emails),
+        ForEach(
+            items=Input.previous.field("items"),
+            max_items=100,
+            max_concurrency=4,
+            nodes=[
+                Python(
+                    fn=prompt,
+                    inputs={"email": Input.item, "instruction": "Classify as feedback, dissatisfied, or happy."},
+                ),
+                ChatCompletion(
+                    model="support-model",
+                    messages=Input.previous,
+                    response_model=Classification,
+                    timeout_seconds=35,
+                    retry=Retry(max_attempts=2, backoff_seconds=1),
+                ),
+                If(
+                    condition=is_dissatisfied,
+                    then=[
+                        Parallel(
+                            max_concurrency=2,
+                            branches={
+                                "summary": haiku_analysis("Summarize this customer complaint."),
+                                "actions": haiku_analysis("List action items for this complaint.", Actions),
+                            },
+                        ),
+                        Python(
+                            fn=make_report,
+                            inputs={
+                                "email": Input.item,
+                                "summary": Input.previous.field("summary"),
+                                "actions": Input.previous.field("actions"),
+                            },
+                        ),
+                    ],
+                    otherwise=[Python(fn=no_report, inputs={"email": Input.item, "classification": Input.previous})],
+                ),
+            ],
+        ),
+    ],
+)
+```
+
+`is_dissatisfied` checks the model's structured `category` field. only its `then` branch defines the Haiku analyses. `haiku_analysis` builds a prompt node and a completion node; it runs on your client when you define the workflow.
+
+`Input.item` keeps the original email available after classification and parallel analysis. `Input.previous.field("summary")` and `.field("actions")` select the two branch outputs. both conditional exits return `EmailResult`; the loop returns `list[EmailResult]` in input order.
+
+### Register and run
+
+replace `support-model` and `haiku` with configured gateway model aliases. set `LITELLM_PROXY_URL` to the gateway root URL without `/v1`, and keep the key in `LITELLM_PROXY_API_KEY`. use a key with the required workflow access.
+
+**execution requires the gateway graph runner, which is still in development. you can compile this definition locally today; the sequential gateway runner does not execute it.**
+
+on a gateway with graph support, register the definition:
 
 ```python
 import os
 
-from liteflow import ChatCompletion, GatewayClient, Input, Python, Workflow
-
-
-def add_signature(reply: str) -> str:
-    return reply.strip() + "\n\nCustomer Care"
-
-
-workflow = Workflow(
-    name="email-reply",
-    nodes=[
-        ChatCompletion(model="support-model", messages=Input.messages),
-        Python(fn=add_signature),
-    ],
-)
+from liteflow import GatewayClient
 
 gateway = GatewayClient(
     base_url=os.environ["LITELLM_PROXY_URL"],
@@ -51,25 +176,22 @@ gateway = GatewayClient(
 draft = gateway.register(workflow)
 ```
 
-`Input.messages` refers to the messages you pass when you run the workflow. the model returns a string, and `add_signature` takes that string as its input. write nodes in execution order.
-
-set `LITELLM_PROXY_URL` to your gateway URL without `/v1`. use a key with workflow registration and invocation access, and replace `support-model` with a configured gateway model alias.
-
-ask an admin to review and publish the draft, then run it:
+ask a separate authorized reviewer to publish the draft. then invoke it with the same client:
 
 ```python
 result = gateway.run(
     workflow.name,
     messages=[
-        {"role": "system", "content": "Write a short customer-service reply."},
-        {"role": "user", "content": "How can I update my account email?"},
+        {"role": "system", "content": "Extract each email from the supplied batch into items."},
+        {"role": "user", "content": "Email 1: My refund is three weeks late.\nEmail 2: Thanks for your help!"},
     ],
 )
 print(result.output)
+print(result.run_id)
 gateway.close()
 ```
 
-`result.output` contains the final reply, including the signature. use `result.run_id` to inspect the run. `run()` calls the gateway's Chat Completions API and executes the published workflow. publish a new draft after changing its definition.
+`run()` invokes `/v1/chat/completions` with `model="workflow/email-processing"`. the final content is a JSON array containing each email, its category and its report. feedback and happy emails have `report: null`. use `result.run_id` to inspect node inputs, outputs and timing on the gateway; publish a new draft after changing the definition.
 
 ## Workflow patterns
 
