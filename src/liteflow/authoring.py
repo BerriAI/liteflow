@@ -1,4 +1,6 @@
-from collections.abc import Callable, Mapping, Sequence
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence as NodeSequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import TypeAlias
@@ -12,6 +14,22 @@ ChatMessage: TypeAlias = ChatCompletionMessageParam
 class Input(str, Enum):
     messages = "messages"
     previous = "previous"
+    item = "item"
+
+    def field(self, name: str) -> FieldRef:
+        return FieldRef(source=self, fields=(name,))
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FieldRef:
+    source: Input
+    fields: tuple[str, ...]
+
+    def field(self, name: str) -> FieldRef:
+        return FieldRef(source=self.source, fields=(*self.fields, name))
+
+
+Binding: TypeAlias = Input | FieldRef | JsonValue
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -23,7 +41,7 @@ class Retry:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ChatCompletion:
     model: str
-    messages: Input | Sequence[ChatMessage]
+    messages: Input | FieldRef | NodeSequence[ChatMessage]
     response_model: type[BaseModel] | None = None
     temperature: float | None = None
     top_p: float | None = None
@@ -38,13 +56,42 @@ class ChatCompletion:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Python:
     fn: Callable[..., object]
-    inputs: Mapping[str, Input | JsonValue] | None = None
+    inputs: Mapping[str, Binding] | None = None
     timeout_seconds: float = 60.0
     retry: Retry = Retry()
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class Sequence:
+    nodes: NodeSequence[Node]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Parallel:
+    branches: Mapping[str, NodeSequence[Node]]
+    max_concurrency: int = 4
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ForEach:
+    items: Binding
+    nodes: NodeSequence[Node]
+    max_items: int = 100
+    max_concurrency: int = 4
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class If:
+    condition: Callable[..., bool]
+    then: NodeSequence[Node]
+    otherwise: NodeSequence[Node]
+
+
+Node: TypeAlias = ChatCompletion | Python | Sequence | Parallel | ForEach | If
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Workflow:
     name: str
-    nodes: Sequence[ChatCompletion | Python]
+    nodes: NodeSequence[Node]
     timeout_seconds: float = 300.0

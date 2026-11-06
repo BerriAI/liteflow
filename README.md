@@ -8,38 +8,138 @@ code-first workflows for the LiteLLM AI Gateway
 
 write your workflow in Python, run it on your gateway, and read the result.
 
-## Features
+## Workflow types
 
-- LLM calls with standard Chat Completions arguments
-- Python functions with typed inputs and outputs
-- structured JSON from Pydantic schemas
-- one client to register, run, and inspect workflows
+- **Sequential:** run nodes in order, passing each result to the next node.
+- **Parallel:** run named branches together and collect their results.
+- **Loop:** use `ForEach` to run the same steps for each item in a list.
+- **Conditional:** use `If` to choose a branch from a structured result.
+- **Hybrid:** combine these patterns in one workflow.
 
 ## Installation
 
-we're building the SDK and gateway runner. follow the [SDK PR](https://github.com/BerriAI/liteflow/pull/3) for the current code; we haven't released a package.
+install from a source checkout:
 
-## Usage
+```sh
+python -m pip install -e .
+```
 
-make a workflow that drafts an email reply and adds a signature:
+these examples compile with this SDK. gateway graph execution is still in development.
+
+## Examples
+
+use these imports for the examples below. replace `sonnet` and `haiku` with your gateway's model aliases.
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel
+
+from liteflow import ChatCompletion, ChatMessage, ForEach, If, Input, Parallel, Python, Workflow
+```
+
+### Sequential
+
+generate a reply, then pass it to a typed Python function:
+
+```python
+def add_signature(reply: str) -> str:
+    return reply + "\n\nCustomer Care"
+
+
+workflow = Workflow(name="email-reply", nodes=[
+    ChatCompletion(model="sonnet", messages=Input.messages),
+    Python(fn=add_signature),
+])
+```
+
+### Parallel
+
+ask two models the same question. the result contains `sonnet` and `haiku` responses:
+
+```python
+workflow = Workflow(name="compare-models", nodes=[
+    Parallel(branches={
+        "sonnet": [ChatCompletion(model="sonnet", messages=Input.messages)],
+        "haiku": [ChatCompletion(model="haiku", messages=Input.messages)],
+    }),
+])
+```
+
+### Loop
+
+extract a list of emails, then summarize each one:
+
+```python
+class Emails(BaseModel):
+    items: list[str]
+
+
+def summary_messages(email: str) -> list[ChatMessage]:
+    return [{"role": "user", "content": "Summarize this email: " + email}]
+
+
+workflow = Workflow(name="email-summaries", nodes=[
+    ChatCompletion(model="sonnet", messages=Input.messages, response_model=Emails),
+    ForEach(items=Input.previous.field("items"), nodes=[
+        Python(fn=summary_messages),
+        ChatCompletion(model="haiku", messages=Input.previous),
+    ]),
+])
+```
+
+`ForEach` passes one item to its body and returns results in the original order.
+
+### Conditional
+
+classify an email. send dissatisfied emails to Haiku; return the category for the others:
+
+```python
+class Classification(BaseModel):
+    category: Literal["feedback", "dissatisfied", "happy"]
+
+
+def is_dissatisfied(result: Classification) -> bool:
+    return result.category == "dissatisfied"
+
+
+def keep_category(result: Classification) -> str:
+    return result.category
+
+
+workflow = Workflow(name="email-triage", nodes=[
+    ChatCompletion(model="sonnet", messages=Input.messages, response_model=Classification),
+    If(condition=is_dissatisfied,
+       then=[ChatCompletion(model="haiku", messages=Input.messages)],
+       otherwise=[Python(fn=keep_category)]),
+])
+```
+
+### Hybrid
+
+combine the loop and parallel patterns: get two model summaries for each email. this reuses `Emails` and `summary_messages` above.
+
+```python
+workflow = Workflow(name="compare-email-summaries", nodes=[
+    ChatCompletion(model="sonnet", messages=Input.messages, response_model=Emails),
+    ForEach(items=Input.previous.field("items"), nodes=[
+        Python(fn=summary_messages),
+        Parallel(branches={
+            "sonnet": [ChatCompletion(model="sonnet", messages=Input.previous)],
+            "haiku": [ChatCompletion(model="haiku", messages=Input.previous)],
+        }),
+    ]),
+])
+```
+
+## Register and run
+
+on a gateway supporting the selected workflow type, use the same client below. set `LITELLM_PROXY_URL` to the gateway root URL without `/v1`, and keep your key in `LITELLM_PROXY_API_KEY`.
 
 ```python
 import os
 
-from liteflow import ChatCompletion, GatewayClient, Input, Python, Workflow
-
-
-def add_signature(reply: str) -> str:
-    return reply.strip() + "\n\nCustomer Care"
-
-
-workflow = Workflow(
-    name="email-reply",
-    nodes=[
-        ChatCompletion(model="support-model", messages=Input.messages),
-        Python(fn=add_signature),
-    ],
-)
+from liteflow import GatewayClient
 
 gateway = GatewayClient(
     base_url=os.environ["LITELLM_PROXY_URL"],
@@ -48,31 +148,19 @@ gateway = GatewayClient(
 draft = gateway.register(workflow)
 ```
 
-`Input.messages` refers to the messages you pass when you run the workflow. the model returns a string, and `add_signature` takes that string as its input. write nodes in execution order.
-
-set `LITELLM_PROXY_URL` to your gateway URL without `/v1`. use a key with workflow registration and invocation access, and replace `support-model` with a configured gateway model alias.
-
-ask an admin to review and publish the draft, then run it:
+ask a separate authorized reviewer to publish the draft. then run it:
 
 ```python
-result = gateway.run(
-    workflow.name,
-    messages=[
-        {"role": "system", "content": "Write a short customer-service reply."},
-        {"role": "user", "content": "How can I update my account email?"},
-    ],
-)
+result = gateway.run(workflow.name, messages=[
+    {"role": "user", "content": "Summarize these emails: My refund is late. Thanks for your help!"},
+])
 print(result.output)
 gateway.close()
 ```
 
-`result.output` contains the final reply, including the signature. use `result.run_id` to inspect the run. `run()` calls the gateway's Chat Completions API and executes the published workflow. publish a new draft after changing its definition.
+`run()` uses Chat Completions with `model="workflow/<name>"`. use `result.run_id` to inspect the run.
 
-more workflow designs:
-
-- [customer emails](examples/email_processing.py): three parallel analyses, then draft, check, and finalize
-- [spreadsheet classification](examples/spreadsheet_classification.py): typed JSON and a Python review threshold
-- [expense intake](examples/expense_review.py): extract fields and choose an if/else branch
+see [graph workflows](docs/graph-workflows.md) for input bindings, limits and node settings, or browse the [full examples](examples/).
 
 ## About
 

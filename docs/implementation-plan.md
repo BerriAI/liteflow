@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: proposed work allocation. This repository contains design examples and contracts; it does not contain an implemented Liteflow SDK, gateway executor, or release package.
+Status: historical work allocation. The repository contains the typed SDK and compiler. Sequential gateway execution is in a separate proxy PR; graph scheduling and release verification remain follow-ups. See [graph workflows](graph-workflows.md) for the SDK's current graph contract and runtime requirements.
 
 Build one complete path first: define typed nodes, register a draft, publish it through a separate authorized publisher, and invoke it through standard Chat Completions. The first executed workflow calls an LLM, transforms its typed result in Monty, then calls an LLM with the generated messages. Extend that path to the email flow with three parallel LLM calls and three sequential LLM calls.
 
@@ -181,3 +181,4 @@ Keep these outside the first release unless the user changes scope:
 - Visual drag-and-drop editing, a second graph format, model-driven agent loops, generalized cycles/maps, downstream recomputation after replay, and intermediate token streaming.
 
 The existing examples show application workflows. They do not guarantee provider-independent structured output, exactly-once external effects, arbitrary Python compatibility, or escape-resistant production execution. Record remaining unsupported behavior in the release notes and public API contract.
+
