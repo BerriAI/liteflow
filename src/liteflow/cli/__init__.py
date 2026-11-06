@@ -149,7 +149,9 @@ def gateway_error(error: httpx.HTTPStatusError) -> str:
         body = None
     detail = body.get("detail") if isinstance(body, dict) else None
     nested = body.get("error") if isinstance(body, dict) else None
-    message = nested.get("message", detail) if isinstance(nested, dict) else detail
+    payload = nested if isinstance(nested, dict) and nested.get("message") is not None else detail
+    message = payload.get("message") if isinstance(payload, dict) else payload
+    code = payload.get("code") if isinstance(payload, dict) else None
     hint = {
         401: "check LITELLM_PROXY_API_KEY",
         403: "run needs an owning-team key with the workflow/<name> grant, "
@@ -159,7 +161,7 @@ def gateway_error(error: httpx.HTTPStatusError) -> str:
         412: "the draft changed, re-run register",
     }.get(response.status_code)
     summary = " ".join(sanitize(str(message if message is not None else response.text)).split())
-    result = f"HTTP {response.status_code}: {summary}"
+    result = f"HTTP {response.status_code}{' ' + sanitize(str(code)) if code else ''}: {summary}"
     return result + (f"\n{hint}" if hint else "")
 
 

@@ -153,6 +153,21 @@ def test_gateway_errors_are_actionable_and_hide_credentials(status, hint):
     assert ENV["LITELLM_PROXY_API_KEY"] not in out + err
 
 
+@pytest.mark.parametrize("envelope", ["detail", "error"])
+@pytest.mark.parametrize("error_code", ["not_found", None, ""])
+def test_workflow_gateway_error_envelopes(envelope, error_code):
+    failure = {"type": "workflow_error", "message": "Workflow not found", "param": None}
+    if error_code is not None:
+        failure["code"] = error_code
+    code, out, err = invoke(
+        ["inspect", "run-id"],
+        lambda request: httpx.Response(404, json={envelope: failure}),
+    )
+    expected_code = " not_found" if error_code else ""
+    assert code == 1 and out == ""
+    assert err == f"error: HTTP 404{expected_code}: Workflow not found\nunknown or inaccessible workflow/run\n"
+
+
 @pytest.mark.parametrize("missing", ["LITELLM_PROXY_URL", "LITELLM_PROXY_API_KEY"])
 def test_missing_environment(missing):
     code, out, err = invoke(["inspect", "run-id", "--json"], env={k: v for k, v in ENV.items() if k != missing})
