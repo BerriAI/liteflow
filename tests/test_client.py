@@ -90,7 +90,7 @@ def _completion(message):
     }
 
 
-@pytest.mark.parametrize("output", ["Reviewed reply", '{"approved":true}'])
+@pytest.mark.parametrize("output", ["", "Reviewed reply", '{"approved":true}'])
 @pytest.mark.parametrize("idempotency_key", [None, "same-request"])
 def test_run_only_invokes_standard_completions_and_returns_inspectable_content(output, idempotency_key):
     requests = []
@@ -137,7 +137,10 @@ def test_run_preserves_http_errors(status):
     [
         {"role": "assistant"},
         {"role": "assistant", "content": None},
-        {"role": "assistant", "content": ""},
+        {
+            "role": "assistant",
+            "tool_calls": [{"id": "call-id", "type": "function", "function": {"name": "prepare", "arguments": "{}"}}],
+        },
         {"role": "assistant", "content": 123},
         {"role": "assistant", "content": {"text": "not content"}},
         {"role": "user", "content": "not an assistant"},
@@ -170,10 +173,11 @@ def test_run_rejects_missing_final_choice(choices):
             client.run("email-reply", messages=[{"role": "user", "content": "Review"}])
 
 
-@pytest.mark.parametrize("headers", [{}, {"x-litellm-workflow-run-id": ""}])
-def test_run_rejects_missing_run_id(headers):
+@pytest.mark.parametrize("output", ["", "Reply"])
+@pytest.mark.parametrize("headers", [{}, {"x-litellm-workflow-run-id": ""}, {"x-litellm-workflow-run-id": " "}])
+def test_run_rejects_missing_run_id(headers, output):
     def gateway(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, headers=headers, json=_completion({"role": "assistant", "content": "Reply"}))
+        return httpx.Response(200, headers=headers, json=_completion({"role": "assistant", "content": output}))
 
     with GatewayClient(
         base_url="https://gateway.invalid", api_key="synthetic", transport=httpx.MockTransport(gateway)

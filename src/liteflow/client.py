@@ -67,7 +67,7 @@ class GatewayClient:
         if len(completion.choices) != 1:
             raise ValueError("Workflow response must contain one final assistant message")
         content = completion.choices[0].message.content
-        if not isinstance(content, str) or not content:
+        if not isinstance(content, str):
             raise ValueError("Workflow response must contain final assistant content")
         run_id = response.headers.get("x-litellm-workflow-run-id")
         if run_id is None or not run_id.strip():
