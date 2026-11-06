@@ -2,6 +2,10 @@
 
 code-first workflows for the LiteLLM AI Gateway
 
+![Liteflow workflow defined in Python with LLM calls, Python transforms, and an if/else branch](docs/assets/liteflow-workflow.gif)
+
+*Workflow design preview.*
+
 write your workflow in Python, run it on your gateway, and read the result.
 
 ## Features
