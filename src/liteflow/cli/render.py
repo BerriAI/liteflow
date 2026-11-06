@@ -22,6 +22,12 @@ def text(value: object) -> Text:
     return Text(sanitize(str(value)))
 
 
+def fields(target: Console, values: Mapping[str, object]) -> None:
+    width = max((len(sanitize(key)) for key in values), default=0)
+    for key, value in values.items():
+        target.print(text(f"{sanitize(key):<{width}}: {value}"))
+
+
 def binding(value: object) -> str:
     if isinstance(value, dict) and "from" in value:
         return f"{value['from']}.{value['output']}"

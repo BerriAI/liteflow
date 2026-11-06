@@ -10,8 +10,15 @@ Set `LITELLM_PROXY_URL` to the gateway root URL without `/v1` and
 `LITELLM_PROXY_API_KEY` to your virtual key. `LITELLM_TEAM_ID` is optional
 and scopes draft registration and reads. There are no credential flags
 
-Execution needs the owning team's virtual key or a team admin. Publication
-stays a separate approval outside the CLI. The CLI never publishes a draft
+`run` needs a virtual key of the owning team with the `workflow/<name>` model
+grant. Being a team admin does not replace that grant
+
+`inspect` allows only the original execution principal or an authorized admin
+of the owning team, using a valid team virtual key. Other owning-team keys
+cannot read the trace
+
+Publication is a separate approval by a distinct team admin who is not a draft
+contributor. It happens outside this CLI. The CLI never publishes a draft
 
 ## Show a local workflow
 
@@ -42,8 +49,13 @@ liteflow register example.py:workflow --workflow-id draft-id
 
 The second form reads the existing draft before replacing it with its ETag
 
-```json
-{"name":"reply","workflow_id":"draft-id","team_id":"team-id","etag":"etag","digest":"digest","published_snapshot_id":null}
+```text
+name                 : reply
+workflow_id          : draft-id
+team_id              : team-id
+etag                 : etag
+digest               : digest
+published_snapshot_id: None
 ```
 
 ## Validate
@@ -52,8 +64,8 @@ The second form reads the existing draft before replacing it with its ETag
 liteflow validate draft-id
 ```
 
-```json
-{"valid":true}
+```text
+valid: True
 ```
 
 ## Run a published workflow
@@ -67,10 +79,11 @@ liteflow run reply --messages messages.json
 
 ```text
 Reviewed reply
-run_id: run-id
 ```
 
-An interactive stderr shows a transient invocation status, not node progress
+The output goes to stdout. `run_id: run-id` goes to stderr, so redirecting
+`liteflow run reply --message 'Review this draft' > out.txt` saves only the
+output. An interactive stderr shows a transient invocation status, not node progress
 
 ## Inspect
 
@@ -104,5 +117,6 @@ Set `NO_COLOR` to any value, including an empty string, to disable ANSI output.
 Piped text output also has no ANSI sequences. Text rendering removes terminal
 control sequences and treats brackets literally rather than as Rich markup
 
-Errors go to stderr and return exit code 1. A 401 points to the API key, a 403
-points to team permissions, and a 409 or 412 asks you to register again
+Errors go to stderr and return exit code 1. Invalid command usage returns 2.
+A 401 points to the API key, a 403 points to invocation grants or trace-read
+permissions, and a 409 or 412 asks you to register again

@@ -87,8 +87,8 @@ def test_run_json():
 def test_run_text_sanitizes_terminal_sequences_without_interpreting_markup():
     output = "\x1b]8;;http://x\x07click\x1b]8;;\x07\x1b[31m[bold red]x[/]"
     code, out, err = invoke(["run", "reply", "--message", "hello"], lambda request: completion(output))
-    assert code == 0 and err == ""
-    assert out == "click[bold red]x[/]\nrun_id: run-id\n"
+    assert code == 0 and err == "run_id: run-id\n"
+    assert out == "click[bold red]x[/]\n"
 
 
 def test_no_color_on_tty():
@@ -137,7 +137,7 @@ def test_inspect_failed_and_unfinished_steps(json_mode):
     "status,hint",
     [
         (401, "LITELLM_PROXY_API_KEY"),
-        (403, "owning team's virtual key"),
+        (403, "owning-team key with the workflow/<name> grant"),
         (404, "unknown or inaccessible"),
         (409, "re-run register"),
         (412, "re-run register"),
@@ -156,12 +156,13 @@ def test_gateway_errors_are_actionable_and_hide_credentials(status, hint):
 @pytest.mark.parametrize("missing", ["LITELLM_PROXY_URL", "LITELLM_PROXY_API_KEY"])
 def test_missing_environment(missing):
     code, out, err = invoke(["inspect", "run-id", "--json"], env={k: v for k, v in ENV.items() if k != missing})
-    assert code == 1 and out == "" and missing in err
+    assert code == 1 and out == "" and f"set {missing}" in err
+    assert ("without /v1" if missing == "LITELLM_PROXY_URL" else "workflow/<name> grant") in err
 
 
 def test_no_api_key_flag():
     code, out, err = invoke(["inspect", "run-id", "--api-key", "forbidden"])
-    assert code == 1 and out == ""
+    assert code == 2 and out == ""
     assert "unrecognized arguments" in err
 
 
@@ -225,13 +226,12 @@ def test_progress_is_only_invocation_status_on_interactive_stderr():
     stderr = Terminal()
 
     def gateway(request):
-        assert "invoking workflow/reply" in stderr.getvalue()
         assert "node_1" not in stderr.getvalue()
         return completion("done")
 
     code, out, err = invoke(["run", "reply", "--message", "hello"], gateway, stderr=stderr)
-    assert code == 0 and out == "done\nrun_id: run-id\n"
-    assert "invoking workflow/reply" in err
+    assert code == 0 and out == "done\n"
+    assert "run_id: run-id" in err
 
 
 @pytest.mark.parametrize("body", [{"detail": "denied\n" * 200}, None])
@@ -241,7 +241,7 @@ def test_error_body_is_bounded_and_preserves_hint(body):
     assert code == 1 and out == ""
     assert len(err.splitlines()) == 2
     assert len(err.splitlines()[0]) <= 507
-    assert "owning team's virtual key" in err
+    assert "owning-team key with the workflow/<name> grant" in err
 
 
 def test_show_bad_attribute_reports_error():
@@ -263,6 +263,53 @@ def test_sanitizer_removes_escape_sequences(value):
     assert sanitize("a\x00\x85\x7fb\n\tc") == "ab\n\tc"
 
 
+def test_sanitizer_removes_bidi_controls():
+    assert sanitize("a\u202a\u202b\u202c\u202d\u202eb\u2066\u2067\u2068\u2069c") == "abc"
+
+
+@pytest.mark.parametrize("args", [["--help"], ["run", "--help"]])
+def test_help_goes_to_injected_stdout(args):
+    code, out, err = invoke(args, env={})
+    assert code == 0 and err == ""
+    assert "usage:" in out
+
+
+@pytest.mark.parametrize("args", [[], ["unknown"], ["run", "reply"], ["inspect"]])
+def test_usage_errors_go_to_stderr(args):
+    code, out, err = invoke(args, env={})
+    assert code == 2 and out == ""
+    assert err.startswith("error:")
+
+
+@pytest.mark.parametrize("command", ["register", "validate"])
+def test_draft_text_is_aligned_sanitized_fields(command):
+    draft = {
+        "name": "[bold]reply\u202e\x1b[31m",
+        "workflow_id": "draft-id",
+        "team_id": "team-id",
+        "etag": "etag",
+        "digest": "digest",
+        "bundle": {},
+        "published_snapshot_id": None,
+    }
+
+    def gateway(request):
+        return httpx.Response(
+            200,
+            json={"valid": True, "message": "[bold]ok\x1b[31m\u2066"}
+            if request.url.path.endswith("/validate")
+            else draft,
+        )
+
+    code, out, err = invoke([command, WORKFLOW if command == "register" else "draft-id"], gateway)
+    assert code == 0 and err == ""
+    assert "\x1b" not in out and "\u202e" not in out and "\u2066" not in out
+    lines = out.splitlines()
+    assert len({line.index(":") for line in lines}) == 1
+    assert "[bold]" in out
+    assert ("published_snapshot_id: None" if command == "register" else "valid  : True") in out
+
+
 def test_json_mode_does_not_import_rich_and_text_reports_missing_extra():
     script = """
 import importlib.abc
@@ -271,7 +318,7 @@ from io import StringIO
 class NoRich(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         if fullname == "rich" or fullname.startswith("rich."):
-            raise ImportError("blocked")
+            raise ModuleNotFoundError("blocked", name="rich")
 sys.meta_path.insert(0, NoRich())
 from liteflow.cli import main
 out, err = StringIO(), StringIO()
