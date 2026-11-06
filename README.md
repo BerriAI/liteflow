@@ -1,6 +1,6 @@
 # liteflow
 
-code-first workflows for the LiteLLM AI Gateway
+define and run workflows on AI Gateway
 
 ![Liteflow workflow defined in Python with LLM calls, Python transforms, and an if/else branch](docs/assets/liteflow-workflow.gif)
 
@@ -21,7 +21,7 @@ workflow = Workflow(name="email-reply", nodes=[
 ])
 ```
 
-Sonnet drafts a reply. Python turns that draft into review messages. Haiku reads those messages and returns the final reply.
+`review_messages` takes Sonnet's draft and prepares Haiku's review request.
 
 ## Register and run
 
@@ -41,7 +41,7 @@ gateway = GatewayClient(
 draft = gateway.register(workflow)
 ```
 
-ask a separate authorized reviewer to publish the draft. then run it and read the result:
+ask a separate authorized reviewer to publish the draft, then run it:
 
 ```python
 result = gateway.run(workflow.name, messages=[
@@ -56,7 +56,7 @@ gateway.close()
 
 ## Advanced workflows
 
-graph definitions compile locally; gateway graph execution is still in development.
+you can compile graph definitions; gateway graph execution is in development.
 
 ### Parallel
 
@@ -73,7 +73,7 @@ workflow = Workflow(name="compare-models", nodes=[
 ])
 ```
 
-the result contains one response per branch.
+read each branch's response from the result.
 
 ### Loop
 
@@ -92,11 +92,11 @@ workflow = Workflow(name="email-summaries", nodes=[
 ])
 ```
 
-`Input.item` is the current message batch. results keep the input order. `items` can also reference a list from an earlier node.
+`Input.item` holds the current messages. `ForEach` returns results in input order and accepts a list from an earlier node.
 
 ### Conditional
 
-use a structured decision to choose which model handles the request:
+choose a model using a JSON field:
 
 ```python
 from pydantic import BaseModel
@@ -118,7 +118,7 @@ workflow = Workflow(name="route-request", nodes=[
 
 ### Hybrid
 
-run models in parallel, then combine their answers in a Python step:
+combine parallel responses with Python:
 
 ```python
 from liteflow import ChatCompletion, Input, Parallel, Python, Workflow
@@ -135,11 +135,11 @@ workflow = Workflow(name="combined-answers", nodes=[
 ])
 ```
 
-register and run any of these with the same client shown above. see [graph workflows](docs/graph-workflows.md) for input bindings and limits.
+use the same `register()` and `run()` calls for these workflows. see [graph workflows](docs/graph-workflows.md) for input bindings and limits.
 
 ## About
 
-use liteflow for work you can define in advance: process an email, classify a spreadsheet row, or route a request for review.
+process customer emails, classify spreadsheet rows, or route requests for review.
 
 see the [gateway API](docs/gateway-api.md), [Python execution contract](docs/execution.md), and [implementation plan](docs/implementation-plan.md).
 
