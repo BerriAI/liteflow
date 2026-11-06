@@ -1,0 +1,1874 @@
+{
+  "contract_version": "1",
+  "input_schema": {
+    "$defs": {
+      "Audio": {
+        "description": "Data about a previous audio response from the model.\n[Learn more](https://platform.openai.com/docs/guides/audio).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Audio",
+        "type": "object"
+      },
+      "ChatCompletionAssistantMessageParam": {
+        "description": "Messages sent by the model in response to user messages.",
+        "properties": {
+          "audio": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Audio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                    },
+                    {
+                      "$ref": "#/$defs/ChatCompletionContentPartRefusalParam"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "function_call": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/FunctionCall"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refusal"
+          },
+          "role": {
+            "const": "assistant",
+            "title": "Role",
+            "type": "string"
+          },
+          "tool_calls": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ChatCompletionMessageFunctionToolCallParam"
+                },
+                {
+                  "$ref": "#/$defs/ChatCompletionMessageCustomToolCallParam"
+                }
+              ]
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ChatCompletionAssistantMessageParam",
+        "type": "object"
+      },
+      "ChatCompletionContentPartImageParam": {
+        "description": "Learn about [image inputs](https://platform.openai.com/docs/guides/vision).",
+        "properties": {
+          "image_url": {
+            "$ref": "#/$defs/ImageURL"
+          },
+          "type": {
+            "const": "image_url",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_url",
+          "type"
+        ],
+        "title": "ChatCompletionContentPartImageParam",
+        "type": "object"
+      },
+      "ChatCompletionContentPartInputAudioParam": {
+        "description": "Learn about [audio inputs](https://platform.openai.com/docs/guides/audio).",
+        "properties": {
+          "input_audio": {
+            "$ref": "#/$defs/InputAudio"
+          },
+          "type": {
+            "const": "input_audio",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input_audio",
+          "type"
+        ],
+        "title": "ChatCompletionContentPartInputAudioParam",
+        "type": "object"
+      },
+      "ChatCompletionContentPartRefusalParam": {
+        "properties": {
+          "refusal": {
+            "title": "Refusal",
+            "type": "string"
+          },
+          "type": {
+            "const": "refusal",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refusal",
+          "type"
+        ],
+        "title": "ChatCompletionContentPartRefusalParam",
+        "type": "object"
+      },
+      "ChatCompletionContentPartTextParam": {
+        "description": "Learn about [text inputs](https://platform.openai.com/docs/guides/text-generation).",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "type"
+        ],
+        "title": "ChatCompletionContentPartTextParam",
+        "type": "object"
+      },
+      "ChatCompletionDeveloperMessageParam": {
+        "description": "Developer-provided instructions that the model should follow, regardless of\nmessages sent by the user. With o1 models and newer, `developer` messages\nreplace the previous `system` messages.",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "const": "developer",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "role"
+        ],
+        "title": "ChatCompletionDeveloperMessageParam",
+        "type": "object"
+      },
+      "ChatCompletionFunctionMessageParam": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "const": "function",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "name",
+          "role"
+        ],
+        "title": "ChatCompletionFunctionMessageParam",
+        "type": "object"
+      },
+      "ChatCompletionMessageCustomToolCallParam": {
+        "description": "A call to a custom tool created by the model.",
+        "properties": {
+          "custom": {
+            "$ref": "#/$defs/Custom"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "custom",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "custom",
+          "type"
+        ],
+        "title": "ChatCompletionMessageCustomToolCallParam",
+        "type": "object"
+      },
+      "ChatCompletionMessageFunctionToolCallParam": {
+        "description": "A call to a function tool created by the model.",
+        "properties": {
+          "function": {
+            "$ref": "#/$defs/Function"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "function",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "function",
+          "type"
+        ],
+        "title": "ChatCompletionMessageFunctionToolCallParam",
+        "type": "object"
+      },
+      "ChatCompletionSystemMessageParam": {
+        "description": "Developer-provided instructions that the model should follow, regardless of\nmessages sent by the user. With o1 models and newer, use `developer` messages\nfor this purpose instead.",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "const": "system",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "role"
+        ],
+        "title": "ChatCompletionSystemMessageParam",
+        "type": "object"
+      },
+      "ChatCompletionToolMessageParam": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "role": {
+            "const": "tool",
+            "title": "Role",
+            "type": "string"
+          },
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "role",
+          "tool_call_id"
+        ],
+        "title": "ChatCompletionToolMessageParam",
+        "type": "object"
+      },
+      "ChatCompletionUserMessageParam": {
+        "description": "Messages sent by an end user, containing prompts or additional context\ninformation.",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                    },
+                    {
+                      "$ref": "#/$defs/ChatCompletionContentPartImageParam"
+                    },
+                    {
+                      "$ref": "#/$defs/ChatCompletionContentPartInputAudioParam"
+                    },
+                    {
+                      "$ref": "#/$defs/File"
+                    }
+                  ]
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "const": "user",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "role"
+        ],
+        "title": "ChatCompletionUserMessageParam",
+        "type": "object"
+      },
+      "Custom": {
+        "description": "The custom tool that the model called.",
+        "properties": {
+          "input": {
+            "title": "Input",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input",
+          "name"
+        ],
+        "title": "Custom",
+        "type": "object"
+      },
+      "File": {
+        "description": "Learn about [file inputs](https://platform.openai.com/docs/guides/text) for text generation.",
+        "properties": {
+          "file": {
+            "$ref": "#/$defs/FileFile"
+          },
+          "type": {
+            "const": "file",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "type"
+        ],
+        "title": "File",
+        "type": "object"
+      },
+      "FileFile": {
+        "properties": {
+          "file_data": {
+            "title": "File Data",
+            "type": "string"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          }
+        },
+        "title": "FileFile",
+        "type": "object"
+      },
+      "Function": {
+        "description": "The function that the model called.",
+        "properties": {
+          "arguments": {
+            "title": "Arguments",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arguments",
+          "name"
+        ],
+        "title": "Function",
+        "type": "object"
+      },
+      "FunctionCall": {
+        "description": "Deprecated and replaced by `tool_calls`.\n\nThe name and arguments of a function that should be called, as generated by the model.",
+        "properties": {
+          "arguments": {
+            "title": "Arguments",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arguments",
+          "name"
+        ],
+        "title": "FunctionCall",
+        "type": "object"
+      },
+      "ImageURL": {
+        "properties": {
+          "detail": {
+            "enum": [
+              "auto",
+              "low",
+              "high"
+            ],
+            "title": "Detail",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "ImageURL",
+        "type": "object"
+      },
+      "InputAudio": {
+        "properties": {
+          "data": {
+            "title": "Data",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "wav",
+              "mp3"
+            ],
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "format"
+        ],
+        "title": "InputAudio",
+        "type": "object"
+      }
+    },
+    "items": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChatCompletionDeveloperMessageParam"
+        },
+        {
+          "$ref": "#/$defs/ChatCompletionSystemMessageParam"
+        },
+        {
+          "$ref": "#/$defs/ChatCompletionUserMessageParam"
+        },
+        {
+          "$ref": "#/$defs/ChatCompletionAssistantMessageParam"
+        },
+        {
+          "$ref": "#/$defs/ChatCompletionToolMessageParam"
+        },
+        {
+          "$ref": "#/$defs/ChatCompletionFunctionMessageParam"
+        }
+      ]
+    },
+    "type": "array"
+  },
+  "name": "compatibility",
+  "nodes": [
+    {
+      "id": "node_1",
+      "max_completion_tokens": 200,
+      "max_tokens": 100,
+      "messages": {
+        "from": "$input",
+        "output": "messages"
+      },
+      "model": "support-model",
+      "response_format": {
+        "json_schema": {
+          "name": "DraftText",
+          "schema": {
+            "properties": {
+              "priority": {
+                "minimum": 0,
+                "title": "Priority",
+                "type": "integer"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "priority"
+            ],
+            "title": "DraftText",
+            "type": "object"
+          },
+          "strict": true
+        },
+        "type": "json_schema"
+      },
+      "retry": {
+        "backoff_seconds": 0.5,
+        "max_attempts": 2
+      },
+      "seed": 7,
+      "stop": [
+        "a",
+        "b"
+      ],
+      "temperature": 0,
+      "timeout_seconds": 35,
+      "top_p": 0.9,
+      "type": "chat_completion"
+    },
+    {
+      "id": "node_2",
+      "inputs": {
+        "draft": {
+          "from": "node_1",
+          "output": "result"
+        },
+        "messages": {
+          "from": "$input",
+          "output": "messages"
+        }
+      },
+      "program": {
+        "contract_version": "1",
+        "function_name": "prepare_record",
+        "input_schema": {
+          "$defs": {
+            "Audio": {
+              "additionalProperties": false,
+              "description": "Data about a previous audio response from the model.\n[Learn more](https://platform.openai.com/docs/guides/audio).",
+              "properties": {
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "Audio",
+              "type": "object"
+            },
+            "ChatCompletionAssistantMessageParam": {
+              "additionalProperties": false,
+              "description": "Messages sent by the model in response to user messages.",
+              "properties": {
+                "audio": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Audio"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                          },
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartRefusalParam"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "function_call": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/FunctionCall"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "refusal": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Refusal"
+                },
+                "role": {
+                  "const": "assistant",
+                  "title": "Role",
+                  "type": "string"
+                },
+                "tool_calls": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ChatCompletionMessageFunctionToolCallParam"
+                      },
+                      {
+                        "$ref": "#/$defs/ChatCompletionMessageCustomToolCallParam"
+                      }
+                    ]
+                  },
+                  "title": "Tool Calls",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "role"
+              ],
+              "title": "ChatCompletionAssistantMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartImageParam": {
+              "additionalProperties": false,
+              "description": "Learn about [image inputs](https://platform.openai.com/docs/guides/vision).",
+              "properties": {
+                "image_url": {
+                  "$ref": "#/$defs/ImageURL"
+                },
+                "type": {
+                  "const": "image_url",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "image_url",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartImageParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartInputAudioParam": {
+              "additionalProperties": false,
+              "description": "Learn about [audio inputs](https://platform.openai.com/docs/guides/audio).",
+              "properties": {
+                "input_audio": {
+                  "$ref": "#/$defs/InputAudio"
+                },
+                "type": {
+                  "const": "input_audio",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "input_audio",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartInputAudioParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartRefusalParam": {
+              "additionalProperties": false,
+              "properties": {
+                "refusal": {
+                  "title": "Refusal",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "refusal",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "refusal",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartRefusalParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartTextParam": {
+              "additionalProperties": false,
+              "description": "Learn about [text inputs](https://platform.openai.com/docs/guides/text-generation).",
+              "properties": {
+                "text": {
+                  "title": "Text",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "text",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartTextParam",
+              "type": "object"
+            },
+            "ChatCompletionDeveloperMessageParam": {
+              "additionalProperties": false,
+              "description": "Developer-provided instructions that the model should follow, regardless of\nmessages sent by the user. With o1 models and newer, `developer` messages\nreplace the previous `system` messages.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "developer",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role"
+              ],
+              "title": "ChatCompletionDeveloperMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionFunctionMessageParam": {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "function",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "name",
+                "role"
+              ],
+              "title": "ChatCompletionFunctionMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionMessageCustomToolCallParam": {
+              "additionalProperties": false,
+              "description": "A call to a custom tool created by the model.",
+              "properties": {
+                "custom": {
+                  "$ref": "#/$defs/Custom"
+                },
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "custom",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "custom",
+                "type"
+              ],
+              "title": "ChatCompletionMessageCustomToolCallParam",
+              "type": "object"
+            },
+            "ChatCompletionMessageFunctionToolCallParam": {
+              "additionalProperties": false,
+              "description": "A call to a function tool created by the model.",
+              "properties": {
+                "function": {
+                  "$ref": "#/$defs/Function"
+                },
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "function",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "function",
+                "type"
+              ],
+              "title": "ChatCompletionMessageFunctionToolCallParam",
+              "type": "object"
+            },
+            "ChatCompletionSystemMessageParam": {
+              "additionalProperties": false,
+              "description": "Developer-provided instructions that the model should follow, regardless of\nmessages sent by the user. With o1 models and newer, use `developer` messages\nfor this purpose instead.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "system",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role"
+              ],
+              "title": "ChatCompletionSystemMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionToolMessageParam": {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "role": {
+                  "const": "tool",
+                  "title": "Role",
+                  "type": "string"
+                },
+                "tool_call_id": {
+                  "title": "Tool Call Id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role",
+                "tool_call_id"
+              ],
+              "title": "ChatCompletionToolMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionUserMessageParam": {
+              "additionalProperties": false,
+              "description": "Messages sent by an end user, containing prompts or additional context\ninformation.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                          },
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartImageParam"
+                          },
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartInputAudioParam"
+                          },
+                          {
+                            "$ref": "#/$defs/File"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "user",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role"
+              ],
+              "title": "ChatCompletionUserMessageParam",
+              "type": "object"
+            },
+            "Custom": {
+              "additionalProperties": false,
+              "description": "The custom tool that the model called.",
+              "properties": {
+                "input": {
+                  "title": "Input",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "input",
+                "name"
+              ],
+              "title": "Custom",
+              "type": "object"
+            },
+            "DraftText": {
+              "properties": {
+                "priority": {
+                  "minimum": 0,
+                  "title": "Priority",
+                  "type": "integer"
+                },
+                "text": {
+                  "title": "Text",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "priority"
+              ],
+              "title": "DraftText",
+              "type": "object",
+              "x-liteflow-record": true
+            },
+            "File": {
+              "additionalProperties": false,
+              "description": "Learn about [file inputs](https://platform.openai.com/docs/guides/text) for text generation.",
+              "properties": {
+                "file": {
+                  "$ref": "#/$defs/FileFile"
+                },
+                "type": {
+                  "const": "file",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file",
+                "type"
+              ],
+              "title": "File",
+              "type": "object"
+            },
+            "FileFile": {
+              "additionalProperties": false,
+              "properties": {
+                "file_data": {
+                  "title": "File Data",
+                  "type": "string"
+                },
+                "file_id": {
+                  "title": "File Id",
+                  "type": "string"
+                },
+                "filename": {
+                  "title": "Filename",
+                  "type": "string"
+                }
+              },
+              "title": "FileFile",
+              "type": "object"
+            },
+            "Function": {
+              "additionalProperties": false,
+              "description": "The function that the model called.",
+              "properties": {
+                "arguments": {
+                  "title": "Arguments",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "arguments",
+                "name"
+              ],
+              "title": "Function",
+              "type": "object"
+            },
+            "FunctionCall": {
+              "additionalProperties": false,
+              "description": "Deprecated and replaced by `tool_calls`.\n\nThe name and arguments of a function that should be called, as generated by the model.",
+              "properties": {
+                "arguments": {
+                  "title": "Arguments",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "arguments",
+                "name"
+              ],
+              "title": "FunctionCall",
+              "type": "object"
+            },
+            "ImageURL": {
+              "additionalProperties": false,
+              "properties": {
+                "detail": {
+                  "enum": [
+                    "auto",
+                    "low",
+                    "high"
+                  ],
+                  "title": "Detail",
+                  "type": "string"
+                },
+                "url": {
+                  "title": "Url",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "title": "ImageURL",
+              "type": "object"
+            },
+            "InputAudio": {
+              "additionalProperties": false,
+              "properties": {
+                "data": {
+                  "title": "Data",
+                  "type": "string"
+                },
+                "format": {
+                  "enum": [
+                    "wav",
+                    "mp3"
+                  ],
+                  "title": "Format",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "data",
+                "format"
+              ],
+              "title": "InputAudio",
+              "type": "object"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "draft": {
+              "$ref": "#/$defs/DraftText"
+            },
+            "messages": {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ChatCompletionDeveloperMessageParam"
+                  },
+                  {
+                    "$ref": "#/$defs/ChatCompletionSystemMessageParam"
+                  },
+                  {
+                    "$ref": "#/$defs/ChatCompletionUserMessageParam"
+                  },
+                  {
+                    "$ref": "#/$defs/ChatCompletionAssistantMessageParam"
+                  },
+                  {
+                    "$ref": "#/$defs/ChatCompletionToolMessageParam"
+                  },
+                  {
+                    "$ref": "#/$defs/ChatCompletionFunctionMessageParam"
+                  }
+                ]
+              },
+              "title": "Messages",
+              "type": "array"
+            }
+          },
+          "required": [
+            "draft",
+            "messages"
+          ],
+          "title": "Arguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "$defs": {
+            "Audio": {
+              "description": "Data about a previous audio response from the model.\n[Learn more](https://platform.openai.com/docs/guides/audio).",
+              "properties": {
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "Audio",
+              "type": "object"
+            },
+            "ChatCompletionAssistantMessageParam": {
+              "description": "Messages sent by the model in response to user messages.",
+              "properties": {
+                "audio": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Audio"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                          },
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartRefusalParam"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "function_call": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/FunctionCall"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "refusal": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Refusal"
+                },
+                "role": {
+                  "const": "assistant",
+                  "title": "Role",
+                  "type": "string"
+                },
+                "tool_calls": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ChatCompletionMessageFunctionToolCallParam"
+                      },
+                      {
+                        "$ref": "#/$defs/ChatCompletionMessageCustomToolCallParam"
+                      }
+                    ]
+                  },
+                  "title": "Tool Calls",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "role"
+              ],
+              "title": "ChatCompletionAssistantMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartImageParam": {
+              "description": "Learn about [image inputs](https://platform.openai.com/docs/guides/vision).",
+              "properties": {
+                "image_url": {
+                  "$ref": "#/$defs/ImageURL"
+                },
+                "type": {
+                  "const": "image_url",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "image_url",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartImageParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartInputAudioParam": {
+              "description": "Learn about [audio inputs](https://platform.openai.com/docs/guides/audio).",
+              "properties": {
+                "input_audio": {
+                  "$ref": "#/$defs/InputAudio"
+                },
+                "type": {
+                  "const": "input_audio",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "input_audio",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartInputAudioParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartRefusalParam": {
+              "properties": {
+                "refusal": {
+                  "title": "Refusal",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "refusal",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "refusal",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartRefusalParam",
+              "type": "object"
+            },
+            "ChatCompletionContentPartTextParam": {
+              "description": "Learn about [text inputs](https://platform.openai.com/docs/guides/text-generation).",
+              "properties": {
+                "text": {
+                  "title": "Text",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "text",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "type"
+              ],
+              "title": "ChatCompletionContentPartTextParam",
+              "type": "object"
+            },
+            "ChatCompletionDeveloperMessageParam": {
+              "description": "Developer-provided instructions that the model should follow, regardless of\nmessages sent by the user. With o1 models and newer, `developer` messages\nreplace the previous `system` messages.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "developer",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role"
+              ],
+              "title": "ChatCompletionDeveloperMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionFunctionMessageParam": {
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "function",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "name",
+                "role"
+              ],
+              "title": "ChatCompletionFunctionMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionMessageCustomToolCallParam": {
+              "description": "A call to a custom tool created by the model.",
+              "properties": {
+                "custom": {
+                  "$ref": "#/$defs/Custom"
+                },
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "custom",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "custom",
+                "type"
+              ],
+              "title": "ChatCompletionMessageCustomToolCallParam",
+              "type": "object"
+            },
+            "ChatCompletionMessageFunctionToolCallParam": {
+              "description": "A call to a function tool created by the model.",
+              "properties": {
+                "function": {
+                  "$ref": "#/$defs/Function"
+                },
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "function",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "function",
+                "type"
+              ],
+              "title": "ChatCompletionMessageFunctionToolCallParam",
+              "type": "object"
+            },
+            "ChatCompletionSystemMessageParam": {
+              "description": "Developer-provided instructions that the model should follow, regardless of\nmessages sent by the user. With o1 models and newer, use `developer` messages\nfor this purpose instead.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "system",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role"
+              ],
+              "title": "ChatCompletionSystemMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionToolMessageParam": {
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "role": {
+                  "const": "tool",
+                  "title": "Role",
+                  "type": "string"
+                },
+                "tool_call_id": {
+                  "title": "Tool Call Id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role",
+                "tool_call_id"
+              ],
+              "title": "ChatCompletionToolMessageParam",
+              "type": "object"
+            },
+            "ChatCompletionUserMessageParam": {
+              "description": "Messages sent by an end user, containing prompts or additional context\ninformation.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartTextParam"
+                          },
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartImageParam"
+                          },
+                          {
+                            "$ref": "#/$defs/ChatCompletionContentPartInputAudioParam"
+                          },
+                          {
+                            "$ref": "#/$defs/File"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                },
+                "role": {
+                  "const": "user",
+                  "title": "Role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "role"
+              ],
+              "title": "ChatCompletionUserMessageParam",
+              "type": "object"
+            },
+            "Custom": {
+              "description": "The custom tool that the model called.",
+              "properties": {
+                "input": {
+                  "title": "Input",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "input",
+                "name"
+              ],
+              "title": "Custom",
+              "type": "object"
+            },
+            "File": {
+              "description": "Learn about [file inputs](https://platform.openai.com/docs/guides/text) for text generation.",
+              "properties": {
+                "file": {
+                  "$ref": "#/$defs/FileFile"
+                },
+                "type": {
+                  "const": "file",
+                  "title": "Type",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file",
+                "type"
+              ],
+              "title": "File",
+              "type": "object"
+            },
+            "FileFile": {
+              "properties": {
+                "file_data": {
+                  "title": "File Data",
+                  "type": "string"
+                },
+                "file_id": {
+                  "title": "File Id",
+                  "type": "string"
+                },
+                "filename": {
+                  "title": "Filename",
+                  "type": "string"
+                }
+              },
+              "title": "FileFile",
+              "type": "object"
+            },
+            "Function": {
+              "description": "The function that the model called.",
+              "properties": {
+                "arguments": {
+                  "title": "Arguments",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "arguments",
+                "name"
+              ],
+              "title": "Function",
+              "type": "object"
+            },
+            "FunctionCall": {
+              "description": "Deprecated and replaced by `tool_calls`.\n\nThe name and arguments of a function that should be called, as generated by the model.",
+              "properties": {
+                "arguments": {
+                  "title": "Arguments",
+                  "type": "string"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "arguments",
+                "name"
+              ],
+              "title": "FunctionCall",
+              "type": "object"
+            },
+            "ImageURL": {
+              "properties": {
+                "detail": {
+                  "enum": [
+                    "auto",
+                    "low",
+                    "high"
+                  ],
+                  "title": "Detail",
+                  "type": "string"
+                },
+                "url": {
+                  "title": "Url",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "title": "ImageURL",
+              "type": "object"
+            },
+            "InputAudio": {
+              "properties": {
+                "data": {
+                  "title": "Data",
+                  "type": "string"
+                },
+                "format": {
+                  "enum": [
+                    "wav",
+                    "mp3"
+                  ],
+                  "title": "Format",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "data",
+                "format"
+              ],
+              "title": "InputAudio",
+              "type": "object"
+            }
+          },
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ChatCompletionDeveloperMessageParam"
+              },
+              {
+                "$ref": "#/$defs/ChatCompletionSystemMessageParam"
+              },
+              {
+                "$ref": "#/$defs/ChatCompletionUserMessageParam"
+              },
+              {
+                "$ref": "#/$defs/ChatCompletionAssistantMessageParam"
+              },
+              {
+                "$ref": "#/$defs/ChatCompletionToolMessageParam"
+              },
+              {
+                "$ref": "#/$defs/ChatCompletionFunctionMessageParam"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "parameter_names": [
+          "draft",
+          "messages"
+        ],
+        "source": "def prepare_record(draft: DraftText, messages: list[ChatMessage]) -> list[ChatMessage]:\n    return messages + [{'role': 'user', 'content': draft.text}]\n",
+        "source_sha256": "184e971e2c2a4d87cc76f4498af657a6a5642104df61fb576adabe3dfdc43e99"
+      },
+      "retry": {
+        "backoff_seconds": 0.0,
+        "max_attempts": 1
+      },
+      "timeout_seconds": 60.0,
+      "type": "python"
+    },
+    {
+      "id": "node_3",
+      "messages": {
+        "from": "node_2",
+        "output": "result"
+      },
+      "model": "support-model",
+      "retry": {
+        "backoff_seconds": 0.0,
+        "max_attempts": 1
+      },
+      "timeout_seconds": 60.0,
+      "type": "chat_completion"
+    }
+  ],
+  "output": {
+    "from": "node_3",
+    "output": "result"
+  },
+  "timeout_seconds": 300.0
+}
