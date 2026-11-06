@@ -2,22 +2,22 @@
 
 code-first workflows for the LiteLLM AI Gateway
 
-write a workflow as a list of LLM calls and Python functions. register it with your gateway, then call it through Chat Completions.
+write your workflow in Python, run it on your gateway, and read the result.
 
 ## Features
 
 - LLM calls with standard Chat Completions arguments
 - Python functions with typed inputs and outputs
-- structured JSON, parallel calls, and if/else branches
-- invocation through the OpenAI client
+- structured JSON from Pydantic schemas
+- one client to register, run, and inspect workflows
 
 ## Installation
 
-we're building the SDK and gateway runner. the examples below show the proposed API; we haven't released a package.
+we're building the SDK and gateway runner. follow the [SDK PR](https://github.com/BerriAI/liteflow/pull/3) for the current code; we haven't released a package.
 
 ## Usage
 
-draft a customer email, then add a signature:
+make a workflow that drafts an email reply and adds a signature:
 
 ```python
 import os
@@ -41,37 +41,30 @@ gateway = GatewayClient(
     base_url=os.environ["LITELLM_PROXY_URL"],
     api_key=os.environ["LITELLM_PROXY_API_KEY"],
 )
-gateway.register(workflow)
+draft = gateway.register(workflow)
 ```
 
-`Input.messages` refers to your request messages. the model returns a string, and `add_signature` takes that string as its input. write nodes in execution order; use the function's annotations to define its input and output.
+`Input.messages` refers to the messages you pass when you run the workflow. the model returns a string, and `add_signature` takes that string as its input. write nodes in execution order.
 
-set `LITELLM_PROXY_URL` to your gateway URL without `/v1` and `LITELLM_PROXY_API_KEY` to a key with workflow registration and invocation access. use a configured gateway model alias for `support-model`.
+set `LITELLM_PROXY_URL` to your gateway URL without `/v1`. use a key with workflow registration and invocation access, and replace `support-model` with a configured gateway model alias.
 
-`register()` saves a draft. a separate publisher reviews and publishes it before you invoke it:
+ask an admin to review and publish the draft, then run it:
 
 ```python
-import os
-
-from openai import OpenAI
-
-client = OpenAI(
-    base_url=os.environ["LITELLM_PROXY_URL"].rstrip("/") + "/v1",
-    api_key=os.environ["LITELLM_PROXY_API_KEY"],
-)
-response = client.chat.completions.create(
-    model="workflow/email-reply",
+result = gateway.run(
+    workflow.name,
     messages=[
         {"role": "system", "content": "Write a short customer-service reply."},
         {"role": "user", "content": "How can I update my account email?"},
     ],
 )
-print(response.choices[0].message.content)
+print(result.output)
+gateway.close()
 ```
 
-use `workflow/<name>` where you'd use a model name. read the final result from `response.choices[0].message.content`.
+`result.output` contains the final reply, including the signature. use `result.run_id` to inspect the run. `run()` calls the gateway's Chat Completions API and executes the published workflow. publish a new draft after changing its definition.
 
-more examples:
+more workflow designs:
 
 - [customer emails](examples/email_processing.py): three parallel analyses, then draft, check, and finalize
 - [spreadsheet classification](examples/spreadsheet_classification.py): typed JSON and a Python review threshold
@@ -79,7 +72,7 @@ more examples:
 
 ## About
 
-use liteflow for work you can define in advance: process an email, classify a spreadsheet row, or route a request for review. write the steps in Python and run them on your LiteLLM gateway.
+use liteflow for work you can define in advance: process an email, classify a spreadsheet row, or route a request for review.
 
 see the [gateway API](docs/gateway-api.md), [Python execution contract](docs/execution.md), and [implementation plan](docs/implementation-plan.md).
 
